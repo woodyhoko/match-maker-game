@@ -1,0 +1,1118 @@
+<!-- Match Maker Game - Powered by Gemma 3n (Bundled) -->
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>The Match Maker - Gemma 3n Edition</title>
+    <!-- Google Fonts for Premium Typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Playfair+Display:ital,wght@0,400;0,700;1,400&display=swap"
+        rel="stylesheet">
+
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
+        crossorigin="anonymous" referrerpolicy="no-referrer" />
+
+    <!-- Import Maps for MediaPipe & HuggingFace -->
+    <script src="https://unpkg.com/es-module-shims@1.7.0/dist/es-module-shims.js"></script>
+    <script type="importmap">
+        {
+            "imports": {
+                "@huggingface/hub": "https://cdn.jsdelivr.net/npm/@huggingface/hub@0.21.0/+esm",
+                "@mediapipe/tasks-genai": "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-genai/+esm"
+            }
+        }
+    </script>
+
+    <style>
+        /* Match Maker Game CSS */
+        :root {
+            --bg-color: #0f172a;
+            --surface-color: #1e293b;
+            --surface-hover: #334155;
+            --primary-color: #f43f5e;
+            /* Rose */
+            --accent-color: #8b5cf6;
+            /* Violet */
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --border-color: #334155;
+            --glass-bg: rgba(30, 41, 59, 0.7);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --font-main: 'Outfit', sans-serif;
+            --font-serif: 'Playfair Display', serif;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            background-image:
+                radial-gradient(circle at 10% 20%, rgba(244, 63, 94, 0.1) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(139, 92, 246, 0.1) 0%, transparent 40%);
+            color: var(--text-primary);
+            font-family: var(--font-main);
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Animations */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(20px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        /* Loader */
+        .loader-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: var(--bg-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+        }
+
+        .loader-content {
+            text-align: center;
+        }
+
+        .loader-content h1 {
+            font-family: var(--font-serif);
+            font-size: 3rem;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(to right, var(--primary-color), var(--accent-color));
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .progress-bar {
+            width: 300px;
+            height: 6px;
+            background: var(--surface-color);
+            border-radius: 3px;
+            margin: 20px auto;
+            overflow: hidden;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, var(--primary-color), var(--accent-color));
+            transition: width 0.3s ease;
+        }
+
+        /* Layout */
+        .app-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 1rem;
+            animation: fadeIn 1s ease-out;
+        }
+
+        /* Header */
+        .game-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 2rem;
+            background: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            border-radius: 1rem;
+            margin-bottom: 1rem;
+            border: 1px solid var(--glass-border);
+        }
+
+        .logo {
+            font-family: var(--font-serif);
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .logo .highlight {
+            color: var(--primary-color);
+        }
+
+        .stats {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+        }
+
+        /* Grid */
+        .game-grid {
+            display: grid;
+            grid-template-columns: 350px 1fr 280px;
+            gap: 1.5rem;
+            flex: 1;
+            overflow: hidden;
+            /* Prevent body scroll */
+        }
+
+        /* Panels */
+        section {
+            background: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--glass-border);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        h2 {
+            margin: 0 0 0.5rem 0;
+            font-family: var(--font-serif);
+            color: var(--text-primary);
+        }
+
+        .subtitle {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-bottom: 1.5rem;
+        }
+
+        /* Clients List */
+        .clients-list {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            overflow-y: auto;
+            padding-right: 0.5rem;
+        }
+
+        .client-card {
+            background: var(--surface-color);
+            padding: 1rem;
+            border-radius: 0.8rem;
+            border: 1px solid transparent;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .client-card:hover:not(.disabled) {
+            transform: translateY(-2px);
+            border-color: var(--primary-color);
+            background: var(--surface-hover);
+        }
+
+        .client-card.disabled {
+            opacity: 0.5;
+            cursor: default;
+            filter: grayscale(1);
+        }
+
+        .client-card h3 {
+            margin: 0 0 0.5rem 0;
+            font-family: var(--font-serif);
+        }
+
+        .client-card .traits {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            line-height: 1.4;
+        }
+
+        .client-card .hidden-trait {
+            color: var(--primary-color);
+            font-style: italic;
+            margin-top: 0.5rem;
+            display: block;
+            font-size: 0.8rem;
+        }
+
+        .assign-btn {
+            margin-top: 0.8rem;
+            width: 100%;
+            padding: 0.5rem;
+            background: var(--surface-hover);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            border-radius: 0.4rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .assign-btn:hover {
+            background: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+
+        /* Chat Area */
+        .interaction-panel {
+            position: relative;
+        }
+
+        .customer-profile {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 1rem;
+        }
+
+        .avatar-placeholder {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+        }
+
+        .customer-details h3 {
+            margin: 0;
+            font-size: 1.2rem;
+        }
+
+        .customer-details p {
+            margin: 0.2rem 0 0 0;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .chat-area {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            padding: 1rem;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 0.8rem;
+            margin-bottom: 1rem;
+        }
+
+        .message {
+            max-width: 80%;
+            padding: 0.8rem 1rem;
+            border-radius: 1rem;
+            font-size: 0.95rem;
+            line-height: 1.5;
+            animation: slideUp 0.3s ease-out;
+        }
+
+        .message.system {
+            align-self: center;
+            background: transparent;
+            color: var(--text-secondary);
+            font-style: italic;
+            border: 1px dashed var(--border-color);
+            text-align: center;
+        }
+
+        .message.customer {
+            align-self: flex-start;
+            background: var(--surface-color);
+            border-bottom-left-radius: 0;
+            border: 1px solid var(--border-color);
+        }
+
+        .message.player {
+            align-self: flex-end;
+            background: var(--accent-color);
+            color: white;
+            border-bottom-right-radius: 0;
+        }
+
+        .input-area {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        #chat-input {
+            flex: 1;
+            background: var(--surface-color);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 1rem;
+            border-radius: 2rem;
+            outline: none;
+            font-family: var(--font-main);
+        }
+
+        #chat-input:focus {
+            border-color: var(--accent-color);
+        }
+
+        #send-btn {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            border: none;
+            background: var(--accent-color);
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            transition: transform 0.2s;
+        }
+
+        #send-btn:hover:not(:disabled) {
+            transform: scale(1.1);
+        }
+
+        #send-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Queue */
+        .queue-list {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            opacity: 0.7;
+        }
+
+        .queue-item {
+            padding: 0.8rem;
+            background: var(--surface-color);
+            border-radius: 0.6rem;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .queue-item.active {
+            border: 1px solid var(--primary-color);
+            opacity: 1;
+        }
+
+        .controls-area {
+            margin-top: auto;
+            padding-top: 1rem;
+        }
+
+        .action-btn {
+            width: 100%;
+            padding: 1rem;
+            background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+            border: none;
+            color: white;
+            border-radius: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        .action-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            background: var(--surface-color);
+        }
+
+        /* Results */
+        .results-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.9);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 3000;
+            backdrop-filter: blur(20px);
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        .results-content {
+            background: var(--surface-color);
+            padding: 3rem;
+            border-radius: 2rem;
+            max-width: 800px;
+            width: 90%;
+            text-align: center;
+            border: 1px solid var(--glass-border);
+        }
+
+        .score-circle {
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            border: 4px solid var(--primary-color);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            margin: 0 auto 2rem auto;
+            font-family: var(--font-serif);
+        }
+
+        .score-circle span {
+            font-size: 3rem;
+            font-weight: 700;
+            background: linear-gradient(to right, var(--primary-color), var(--accent-color));
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .matches-review {
+            text-align: left;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-bottom: 2rem;
+            padding: 1rem;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 1rem;
+        }
+
+        .matches-review p {
+            margin-bottom: 0.5rem;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 0.5rem;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--surface-hover);
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-secondary);
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Loading Overlay -->
+    <div id="loader-overlay" class="loader-overlay">
+        <div class="loader-content">
+            <h1>The Match Maker</h1>
+            <p>Powered by Google Gemma 3n</p>
+            <p id="loader-message">Initializing Simulation...</p>
+            <div class="progress-bar">
+                <div id="progress-bar-fill" class="progress-bar-fill"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main App Container -->
+    <main class="app-container" id="main-container" style="display: none;">
+
+        <!-- Top Bar -->
+        <header class="game-header">
+            <div class="logo">Match<span class="highlight">Maker</span></div>
+            <div class="stats">
+                <span id="customers-left">Customers: 5/5</span>
+            </div>
+        </header>
+
+        <!-- Game Area -->
+        <div class="game-grid">
+
+            <!-- Left Panel: Your Clients -->
+            <section class="clients-panel">
+                <h2>Your Clients</h2>
+                <p class="subtitle">Sell their pros, hide their cons.</p>
+                <div class="clients-list" id="clients-list">
+                    <!-- Client Cards injected here -->
+                </div>
+            </section>
+
+            <!-- Center Panel: Interaction -->
+            <section class="interaction-panel">
+                <!-- Current customer info -->
+                <div class="customer-profile" id="customer-profile">
+                    <div class="avatar-placeholder"><i class="fa-solid fa-user-secret"></i></div>
+                    <div class="customer-details">
+                        <h3 id="customer-name">Waiting for customer...</h3>
+                        <p id="customer-hint">...</p>
+                    </div>
+                </div>
+
+                <!-- Chat Area -->
+                <div class="chat-area" id="chat-area">
+                    <div class="message system">
+                        <p>Welcome, Matchmaker. Your first customer is approaching.</p>
+                    </div>
+                </div>
+
+                <!-- Input Area -->
+                <div class="input-area">
+                    <input type="text" id="chat-input" placeholder="Chat with the customer to understand their needs..."
+                        disabled>
+                    <button id="send-btn" disabled><i class="fa-solid fa-paper-plane"></i></button>
+                </div>
+            </section>
+
+            <!-- Right Panel: Queue / Status -->
+            <section class="queue-panel">
+                <h2>Queue</h2>
+                <div class="queue-list" id="queue-list">
+                    <!-- Queue items -->
+                </div>
+
+                <div class="controls-area">
+                    <button id="next-customer-btn" class="action-btn icon-btn" disabled>
+                        Start Next Session <i class="fa-solid fa-arrow-right"></i>
+                    </button>
+                </div>
+            </section>
+
+        </div>
+    </main>
+
+    <!-- Results Overlay -->
+    <div id="results-overlay" class="results-overlay" style="display: none;">
+        <div class="results-content">
+            <h2>Evaluation Complete</h2>
+            <div class="score-display">
+                <div class="score-circle">
+                    <span id="final-score">0</span>
+                    <label>Score</label>
+                </div>
+            </div>
+            <div class="matches-review" id="matches-review">
+                <!-- Review details -->
+            </div>
+            <button id="restart-btn" class="action-btn">Play Again</button>
+        </div>
+    </div>
+
+    <script type="module">
+        import { oauthLoginUrl, oauthHandleRedirectIfPresent } from "@huggingface/hub";
+        import { FilesetResolver, LlmInference } from '@mediapipe/tasks-genai';
+
+        // --- Configuration & Constants ---
+        const MODEL_FILENAME = "gemma-3n-e2b-it-gpu-int4.bin"; // Local name
+        const use_e4b = false;
+        const modelSize = 0; // Disabled strict check due to model switch
+        const remoteFileUrl = 'https://huggingface.co/google/gemma-3n-E2B-it-litert-lm/resolve/main/gemma-3n-E2B-it-int4-Web.litertlm';
+
+        // --- Game State ---
+        let gameState = {
+            clients: [],
+            outsiders: [],
+            currentOutsiderIndex: -1,
+            matches: [], // { clientIndex, outsiderIndex }
+            chatHistory: [], // Array of { role: 'user' | 'model', text: string }
+            isGameOver: false
+        };
+
+        let llmInference = null;
+
+        // --- DOM Elements ---
+        const loaderOverlay = document.getElementById('loader-overlay');
+        const loaderMessage = document.getElementById('loader-message');
+        const progressBarFill = document.getElementById('progress-bar-fill');
+        const mainContainer = document.getElementById('main-container');
+        const clientsListEl = document.getElementById('clients-list');
+        const customerNameEl = document.getElementById('customer-name');
+        const customerHintEl = document.getElementById('customer-hint');
+        const chatAreaEl = document.getElementById('chat-area');
+        const chatInputEl = document.getElementById('chat-input');
+        const sendBtnEl = document.getElementById('send-btn');
+        const queueListEl = document.getElementById('queue-list');
+        const nextCustomerBtn = document.getElementById('next-customer-btn');
+        const customersLeftEl = document.getElementById('customers-left');
+        const resultsOverlay = document.getElementById('results-overlay');
+        const finalScoreEl = document.getElementById('final-score');
+        const matchesReviewEl = document.getElementById('matches-review');
+        const restartBtn = document.getElementById('restart-btn');
+
+        // --- Initialization ---
+
+        async function init() {
+            try {
+                await loadLlm();
+                startNewGame();
+            } catch (e) {
+                console.error("Init failed:", e);
+                loaderMessage.textContent = "Error initializing: " + e.message;
+            }
+        }
+
+        // --- Model Loading (Adapted from Example) ---
+
+        function updateProgressBar(percentage) {
+            if (progressBarFill) progressBarFill.style.width = `${percentage}%`;
+        }
+
+        async function loadLlm() {
+            loaderMessage.textContent = "Checking model cache...";
+
+            // Check for file protocol which often causes SecurityError with OPFS/WebGPU
+            if (window.location.protocol === 'file:') {
+                alert("Local Security Restriction:\n\nThis game uses advanced WebGPU/OPFS features that browsers block in 'file://' mode.\n\nPlease run via a local web server (localhost).\n\nQuick fix: open terminal -> python -m http.server -> goto localhost:8000");
+                // We don't throw immediately to let it try, but it will likely fail below.
+            }
+
+            const isChrome = navigator.userAgent.includes('Chrome');
+            if (!isChrome && !navigator.userAgent.includes('Edg')) {
+                alert('Please use Chrome or Edge for WebGPU support.');
+            }
+
+            let opfs;
+            try {
+                opfs = await navigator.storage.getDirectory();
+            } catch (e) {
+                if (e.name === 'SecurityError') {
+                    throw new Error("Security Block: Browser prevented file system access. You are likely running from a local file without a server. Please serve this folder via HTTP (localhost).");
+                }
+                throw e;
+            }
+
+            let fileHandle;
+            let file;
+
+            try {
+                fileHandle = await opfs.getFileHandle("3n_e2b");
+                file = await fileHandle.getFile();
+
+                // Check if we previously finished downloading
+                const isComplete = localStorage.getItem("3n_e2b_complete") === "true";
+
+                if (!isComplete) {
+                    console.log("Found partial download. Resuming...");
+                    throw new Error("Partial download");
+                }
+
+                // Verify file integrity (basic size check)
+                if (file.size < 1024 * 1024) {
+                    console.warn("Cached model file is too small. Deleting.");
+                    await fileHandle.remove();
+                    throw new Error("Corrupted cache");
+                }
+
+                console.log("Model found in cache. Size: " + (file.size / 1024 / 1024).toFixed(2) + " MB");
+            } catch (e) {
+                console.log("Downloading model...", e);
+
+                // If we are here, we are downloading (or resuming)
+                // If fileHandle exists (from Partial error), use it. otherwise create/get it.
+                if (!fileHandle) {
+                    try { fileHandle = await opfs.getFileHandle("3n_e2b", { create: true }); }
+                    catch (err) { /* ignore */ }
+                }
+
+                // Manual Token Input
+                let token = localStorage.getItem("hf_token");
+                if (!token) {
+                    token = prompt("Gemma 3n requires a Hugging Face Access Token.\n\n1. Go to huggingface.co/settings/tokens\n2. Create a 'Read' token\n3. Paste it here:");
+                    if (!token) throw new Error("Token required to download model.");
+                    localStorage.setItem("hf_token", token.trim());
+                }
+
+                // Check for partial file to resume
+                let existingSize = 0;
+                try {
+                    const existingFile = await fileHandle.getFile();
+                    existingSize = existingFile.size;
+                    if (existingSize > 0) {
+                        console.log(`Found partial file: ${(existingSize / 1e6).toFixed(1)}MB. Attempting resume...`);
+                    }
+                } catch (e) { /* ignore if file doesn't exist */ }
+
+                // Download
+                const headers = { "Authorization": `Bearer ${token}` };
+                if (existingSize > 0) headers["Range"] = `bytes=${existingSize}-`;
+
+                const response = await fetch(remoteFileUrl, { headers });
+
+                if (response.status === 401 || response.status === 403) {
+                    localStorage.removeItem("hf_token");
+                    const modelPage = "https://huggingface.co/google/gemma-3n-E2B-it-litert-lm";
+                    alert(`Access Denied (401/403).\n\n1. Ensure your token is correct.\n2. You MUST accept the license agreement for this SPECIFIC model (E2B).\n\nOpening model page in new tab...`);
+                    window.open(modelPage, '_blank');
+                    throw new Error("License not accepted. Please accept license at " + modelPage);
+                }
+
+                if (!response.ok) throw new Error("Download failed: " + response.statusText);
+
+                // Content-Length is only the *remaining* part if 206, or full if 200
+                const contentLength = Number(response.headers.get('content-length'));
+                const isPartial = response.status === 206;
+                const totalBytes = isPartial ? existingSize + contentLength : contentLength;
+
+                // If server didn't accept range (sent 200), we must start over
+                if (existingSize > 0 && !isPartial) {
+                    console.warn("Server doesn't support resume or restart forced. Overwriting.");
+                    existingSize = 0;
+                }
+
+                fileHandle = await opfs.getFileHandle("3n_e2b", { create: true });
+                // keepExistingData: true is critical for appending
+                let writeStream = await fileHandle.createWritable({ useAtomicWrite: false, keepExistingData: true });
+
+                if (isPartial) {
+                    await writeStream.seek(existingSize);
+                } else {
+                    // If we are starting over (status 200), truncate to be safe
+                    await writeStream.truncate(0);
+                }
+
+                const reader = response.body.getReader(); // Use response.body.getReader()
+                let writer = writeStream.getWriter();
+                let bytesCount = existingSize;
+                let bytesSinceLastCheckpoint = 0;
+                const CHECKPOINT_INTERVAL = 5 * 1024 * 1024; // 5MB (More frequent saves)
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    bytesCount += value.length;
+                    bytesSinceLastCheckpoint += value.length;
+
+                    if (totalBytes) updateProgressBar(Math.round(bytesCount / totalBytes * 90));
+                    loaderMessage.innerHTML = `Downloading... ${(bytesCount / 1e6).toFixed(1)}MB / ${(totalBytes / 1e6).toFixed(1)}MB<br><span style="font-size: 0.8em; color: #aaa;">(Auto-saving every 5MB)</span>`;
+                    await writer.write(value);
+
+                    // Periodically close and re-open to "checkpoint" the file to disk
+                    if (bytesSinceLastCheckpoint > CHECKPOINT_INTERVAL) {
+                        await writer.close();
+                        console.log(`Checkpointing at ${bytesCount} bytes...`);
+
+                        // Re-open
+                        writeStream = await fileHandle.createWritable({ useAtomicWrite: false, keepExistingData: true });
+                        await writeStream.seek(bytesCount);
+                        writer = writeStream.getWriter();
+
+                        bytesSinceLastCheckpoint = 0;
+                    }
+                }
+                await writer.close();
+                localStorage.setItem("3n_e2b_complete", "true");
+                file = await fileHandle.getFile();
+            }
+
+            loaderMessage.textContent = "Initializing WebGPU Inference...";
+            const fileset = await FilesetResolver.forGenAiTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-genai/wasm');
+
+            // Use stream reader to save memory during init if possible, or ArrayBuffer if the API requires strictly one. 
+            // The example uses Reader for modelAssetBuffer, so we will follow that.
+            const assetReader = file.stream().getReader();
+
+            llmInference = await LlmInference.createFromOptions(fileset, {
+                baseOptions: { modelAssetBuffer: assetReader },
+                maxTokens: 1024,
+                topK: 1,
+                temperature: 0.8
+            });
+
+            loaderOverlay.style.display = 'none';
+            mainContainer.style.display = 'flex';
+        }
+
+        // --- Game Logic ---
+
+        function startNewGame() {
+            clientsListEl.innerHTML = ''; // reset clients UI
+
+            gameState = {
+                clients: generateClients(),
+                outsiders: generateOutsiders(),
+                currentOutsiderIndex: -1,
+                matches: [],
+                chatHistory: [],
+                isGameOver: false
+            };
+
+            renderClients();
+            renderQueue();
+            startNextCustomer();
+        }
+
+        function generateClients() {
+            return [
+                { id: 0, name: "Baron Von Rich", bio: "Wealthy industrialist.", pros: "Extremely rich, generous with gifts.", cons: "Secretly a vampire (figuratively?), very controlling.", flaws: "Controlling, Arrogant" },
+                { id: 1, name: "Timmy 'The Tool'", bio: "Local mechanic suitable for anyone.", pros: "Fixes anything, loyal.", cons: "Cannot hold a conversation not about cars. Hygiene issues.", flaws: "Boring, Smelly" },
+                { id: 2, name: "Lady Gossamer", bio: "Socialite looking for a companion.", pros: "Knows everyone, exciting parties.", cons: "Will gossip about you to the queen. Spendthrift.", flaws: "Gossip, Spends too much" },
+                { id: 3, name: "Professor Chaos", bio: "Genius inventor.", pros: "Brilliant, never boring.", cons: "Experiments occasionally explode. forgets to eat.", flaws: "Dangerous, Absent-minded" },
+                { id: 4, name: "Average Andy", bio: "Just a guy.", pros: "Stable, predictable.", cons: "Secretly an intergalactic spy... wait no, actually just boring.", flaws: "Compulsively lies about being a spy" }
+            ];
+        }
+
+        function generateOutsiders() {
+            return [
+                { id: 0, name: "Sarah Seeking", needs: "I want someone exciting who can take care of me.", persona: "You are Sarah, a young woman looking for excitement and wealth. You hate boring people." },
+                { id: 1, name: "Bob Builder", needs: "I need someone practical who is handy.", persona: "You are Bob. You are practical, down to earth. You hate drama." },
+                { id: 2, name: "Mysterious M", needs: "I want to know secrets.", persona: "You are M. You love gossip and drama. You want to be in the social loop." },
+                { id: 3, name: "Dr. Z", needs: "I need an intellectual equal.", persona: "You are Dr. Z. You value intelligence above all else. You dislike simpletons." },
+                { id: 4, name: "Agent X", needs: "I need a cover story... I mean a spouse.", persona: "You are Agent X. You need someone normal to blend in. Extremely paranoid." }
+            ];
+        }
+
+        function startNextCustomer() {
+            if (gameState.currentOutsiderIndex >= 4) {
+                endGame();
+                return;
+            }
+
+            gameState.currentOutsiderIndex++;
+            gameState.chatHistory = [];
+
+            // Update UI
+            const customer = gameState.outsiders[gameState.currentOutsiderIndex];
+            customerNameEl.textContent = customer.name;
+            customerHintEl.textContent = `Needs: ${customer.needs}`;
+            chatAreaEl.innerHTML = `<div class="message system"><p>New customer arrived.</p></div>`;
+
+            // Initial Greeting from Customer
+            addMessageToChat('model', "Hello! I'm here to find a match. " + customer.needs);
+
+            // Controls
+            chatInputEl.disabled = false;
+            sendBtnEl.disabled = false;
+            nextCustomerBtn.disabled = true;
+            updateQueueUI();
+        }
+
+        function renderClients() {
+            clientsListEl.innerHTML = '';
+            gameState.clients.forEach(client => {
+                // Check if already matched
+                if (gameState.matches.some(m => m.clientIndex === client.id)) return;
+
+                const card = document.createElement('div');
+                card.className = 'client-card';
+                card.innerHTML = `
+            <h3>${client.name}</h3>
+            <div class="traits">
+                <strong>Pros:</strong> ${client.pros}<br>
+                <span class="hidden-trait"><strong>Secret Cons:</strong> ${client.cons}</span>
+            </div>
+            <button class="assign-btn" onclick="window.handleAssign(${client.id})">Match with Current Customer</button>
+        `;
+                clientsListEl.appendChild(card);
+            });
+        }
+
+        function renderQueue() {
+            queueListEl.innerHTML = '';
+            gameState.outsiders.forEach((outsider, idx) => {
+                const item = document.createElement('div');
+                item.className = `queue-item ${idx === gameState.currentOutsiderIndex ? 'active' : ''}`;
+                item.textContent = idx < gameState.currentOutsiderIndex ? `✅ ${outsider.name}` : `${idx + 1}. ${outsider.name}`;
+                queueListEl.appendChild(item);
+            });
+        }
+
+        function updateQueueUI() {
+            renderQueue();
+            customersLeftEl.textContent = `Customers: ${gameState.currentOutsiderIndex + 1}/5`;
+        }
+
+
+        // --- Chat & LLM Interaction ---
+
+        async function handleUserSubmit() {
+            const text = chatInputEl.value.trim();
+            if (!text) return;
+
+            addMessageToChat('player', text);
+            chatInputEl.value = '';
+
+            await generateCustomerResponse(text);
+        }
+
+        function addMessageToChat(role, text) {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `message ${role}`;
+            msgDiv.textContent = text;
+            chatAreaEl.appendChild(msgDiv);
+            chatAreaEl.scrollTop = chatAreaEl.scrollHeight;
+
+            if (role !== 'system') {
+                gameState.chatHistory.push({ role, text });
+            }
+            return msgDiv; // Return element for streaming updates
+        }
+
+        async function generateCustomerResponse(userText) {
+            chatInputEl.disabled = true;
+            sendBtnEl.disabled = true;
+
+            const customer = gameState.outsiders[gameState.currentOutsiderIndex];
+
+            // Prompt Engineering
+            // We construct a prompt that includes the Persona and the conversation history
+            const historyText = gameState.chatHistory.map(m =>
+                (m.role === 'player' ? 'Matchmaker: ' : 'You: ') + m.text
+            ).join('\n');
+
+            const prompt = `<start_of_turn>user\nRoleplay as ${customer.name}. Persona: ${customer.persona}\nYour Needs: ${customer.needs}\n\nCurrent Context: You are at a matchmaking agency talking to the matchmaker. Matchmaker just said: "${userText}"\n\nTask: Reply to the matchmaker. Keep it short (1-2 sentences). Stay in character.\n<end_of_turn>\n<start_of_turn>model\n`;
+
+            // Create a placeholder message for streaming
+            const msgDiv = addMessageToChat('customer', '...');
+            let fullResponse = "";
+
+            try {
+                await llmInference.generateResponse(prompt, (partialText, done) => {
+                    if (fullResponse === "") msgDiv.textContent = ""; // Clear placeholder on first token
+                    fullResponse += partialText;
+                    msgDiv.textContent = fullResponse;
+                    chatAreaEl.scrollTop = chatAreaEl.scrollHeight;
+                });
+
+                // Update history with final response
+                gameState.chatHistory.push({ role: 'customer', text: fullResponse });
+
+            } catch (e) {
+                console.error("Inference error", e);
+                msgDiv.textContent = "[Connection Lost]";
+                addMessageToChat('system', "Error getting response from customer.");
+            } finally {
+                chatInputEl.disabled = false;
+                sendBtnEl.disabled = false;
+                chatInputEl.focus();
+            }
+        }
+
+
+
+        // --- Matching Logic ---
+
+        window.handleAssign = function (clientId) {
+            if (confirm(`Are you sure you want to match this customer with ${gameState.clients[clientId].name}?`)) {
+                gameState.matches.push({
+                    outsiderIndex: gameState.currentOutsiderIndex,
+                    clientIndex: clientId,
+                    history: [...gameState.chatHistory] // Save history for evaluation
+                });
+
+                chatInputEl.disabled = true;
+                sendBtnEl.disabled = true;
+
+                renderClients(); // Remove assigned client
+
+                if (gameState.currentOutsiderIndex < 4) {
+                    nextCustomerBtn.disabled = false;
+                    // Auto advance for nice flow
+                    setTimeout(startNextCustomer, 1000);
+                } else {
+                    endGame();
+                }
+            }
+        };
+
+        // --- Evaluation ---
+
+        async function endGame() {
+            gameState.isGameOver = true;
+            resultsOverlay.style.display = 'flex';
+            finalScoreEl.textContent = "...";
+
+            // construct big prompt for evaluation
+            let prompt = `<start_of_turn>user\nTask: Evaluate the Matchmaker's performance.
+    
+    You are the Game Arbiter. Start with a simplified JSON object, then a short summary.
+    
+    Matches made:
+    `;
+
+            gameState.matches.forEach((m, i) => {
+                const client = gameState.clients[m.clientIndex];
+                const outsider = gameState.outsiders[m.outsiderIndex];
+                prompt += `\nMatch ${i + 1}: Customer "${outsider.name}" (Needs: ${outsider.needs}) matched with Client "${client.name}" (Traits: ${client.pros}, Secretly: ${client.cons}).\n`;
+            });
+
+            prompt += `\nRate the matches from 0 to 100 based on:
+    1. Compatibility
+    2. Honesty (did the matchmaker hide the flaws too much?)
+    
+    Respond in this format strictly:
+    SCORE: [number]
+    REVIEW: [text summary]
+    <end_of_turn>\n<start_of_turn>model\n`;
+
+            try {
+                const result = await llmInference.generateResponse(prompt);
+                console.log("Evaluation:", result);
+
+                // Simple parse
+                const scoreMatch = result.match(/SCORE:\s*(\d+)/i);
+                const score = scoreMatch ? parseInt(scoreMatch[1]) : 50;
+
+                // Animation for score
+                let currentScore = 0;
+                const interval = setInterval(() => {
+                    currentScore += 2;
+                    if (currentScore >= score) {
+                        currentScore = score;
+                        clearInterval(interval);
+                    }
+                    finalScoreEl.textContent = currentScore;
+                }, 30);
+
+                matchesReviewEl.innerHTML = `<p>${result.replace(/SCORE:\s*\d+/, '').trim()}</p>`;
+
+            } catch (e) {
+                finalScoreEl.textContent = "?";
+                matchesReviewEl.textContent = "Judge went on vacation. (Error evaluating)";
+            }
+        }
+
+        // --- Event Listeners ---
+
+        sendBtnEl.addEventListener('click', handleUserSubmit);
+        chatInputEl.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') handleUserSubmit();
+        });
+
+        nextCustomerBtn.addEventListener('click', startNextCustomer);
+
+        restartBtn.addEventListener('click', () => {
+            resultsOverlay.style.display = 'none';
+            startNewGame();
+        });
+
+        // Start
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+
+</html>
