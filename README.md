@@ -45,12 +45,14 @@ const assetReader = modelFile.stream().getReader();
 llmInference = await LlmInference.createFromOptions(fileset, {
   baseOptions: { modelAssetBuffer: assetReader },
   maxTokens: 1024,
-  topK: 1,           // greedy decoding for consistent match scoring
+  topK: 1,           // source default — see note below
   temperature: 0.8
 });
 
 const result = await llmInference.generateResponse(prompt);
 ```
+
+> **Note on `topK`:** The source code uses `topK: 1`, which is greedy decoding — always picking the single most likely next token. This makes match scores deterministic (same profile pair → same score every time), but it limits response variety in the conversational phase. `temperature: 0.8` has no effect when `topK=1`. For more natural, varied AI client dialogue, change `topK` to `40`; for purely deterministic scoring, keep `topK: 1`.
 
 The model binary is downloaded once from HuggingFace Hub (ESM CDN) and cached by the browser's Cache Storage API — subsequent loads are instant.
 
