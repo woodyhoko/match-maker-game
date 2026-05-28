@@ -33,22 +33,23 @@ These techniques allow a model with the capability of a larger LLM to run with t
 ## 3. MediaPipe Tasks GenAI integration
 
 ```javascript
-import { FilesetResolver, LlmInference } from
-  'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-genai';
+import { FilesetResolver, LlmInference } from '@mediapipe/tasks-genai';
 
-const genai = await FilesetResolver.forGenAiTasks(
+const fileset = await FilesetResolver.forGenAiTasks(
   'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-genai/wasm'
 );
 
-const llm = await LlmInference.createFromModelPath(genai, {
-  modelAssetPath: 'https://huggingface.co/.../gemma-3n-E2B-it-int4.bin',
-  maxTokens: 512,
-  topK: 40,
-  temperature: 0.8,
-  randomSeed: 42
+// Model binary streamed from OPFS cache (downloaded from HuggingFace on first run)
+const assetReader = modelFile.stream().getReader();
+
+llmInference = await LlmInference.createFromOptions(fileset, {
+  baseOptions: { modelAssetBuffer: assetReader },
+  maxTokens: 1024,
+  topK: 1,           // greedy decoding for consistent match scoring
+  temperature: 0.8
 });
 
-const result = await llm.generateResponse(prompt);
+const result = await llmInference.generateResponse(prompt);
 ```
 
 The model binary is downloaded once from HuggingFace Hub (ESM CDN) and cached by the browser's Cache Storage API — subsequent loads are instant.
