@@ -1,11 +1,11 @@
-<!-- Match Maker Game - Powered by Gemma 3n (Bundled) -->
+<!-- Match Maker Game - Powered by on-device Gemma 4 (LiteRT / WebGPU) -->
 <!doctype html>
 <html lang="en">
 
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>The Match Maker - Gemma 3n Edition</title>
+    <title>The Match Maker - Gemma 4 Edition</title>
     <!-- Google Fonts for Premium Typography -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -22,7 +22,6 @@
     <script type="importmap">
         {
             "imports": {
-                "@huggingface/hub": "https://cdn.jsdelivr.net/npm/@huggingface/hub@0.21.0/+esm",
                 "@mediapipe/tasks-genai": "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-genai/+esm"
             }
         }
@@ -130,6 +129,11 @@
             background: linear-gradient(90deg, var(--primary-color), var(--accent-color));
             transition: width 0.3s ease;
         }
+
+        #model-gate { max-width: 440px; margin: 18px auto 0; }
+        .model-note { font-size: 0.95rem; line-height: 1.55; opacity: 0.85; margin-bottom: 18px; }
+        .model-subnote { font-size: 0.78rem; line-height: 1.5; opacity: 0.55; margin-top: 14px; }
+        #load-model-btn { font-size: 1.05rem; padding: 14px 30px; }
 
         /* Layout */
         .app-container {
@@ -523,6 +527,24 @@
         ::-webkit-scrollbar-thumb:hover {
             background: var(--text-secondary);
         }
+
+        /* --- Mobile / tablet --- */
+        @media (max-width: 900px) {
+            .app-container { height: auto; min-height: 100vh; padding: 0.75rem; }
+            .game-grid {
+                grid-template-columns: 1fr;
+                overflow: visible;
+                flex: none;
+            }
+            section { overflow: visible; }
+            .game-header { flex-direction: column; gap: 0.5rem; padding: 1rem; text-align: center; }
+        }
+        @media (max-width: 560px) {
+            .loader-content h1 { font-size: 2.2rem; }
+            #model-gate { max-width: 92vw; }
+            .game-header .logo { font-size: 1.25rem; }
+            .progress-bar { width: 80vw; max-width: 300px; }
+        }
     </style>
 </head>
 
@@ -531,9 +553,17 @@
     <div id="loader-overlay" class="loader-overlay">
         <div class="loader-content">
             <h1>The Match Maker</h1>
-            <p>Powered by Google Gemma 3n</p>
-            <p id="loader-message">Initializing Simulation...</p>
-            <div class="progress-bar">
+            <p>Powered by Google Gemma 4 · runs 100% in your browser</p>
+
+            <!-- Opt-in download gate: nothing downloads until the user chooses -->
+            <div id="model-gate">
+                <p class="model-note">This game thinks with the on-device <b>Gemma 4 E2B</b> model running locally via WebGPU — your conversations never leave your device. The model is a large one-time download (≈ 2 GB) that your browser caches for next time.</p>
+                <button id="load-model-btn" class="action-btn"><i class="fa-solid fa-download"></i> Download &amp; Play</button>
+                <p class="model-subnote">Only downloads when you click. Needs Chrome or Edge with WebGPU. You can also just close this if you'd rather not download a 2&nbsp;GB model.</p>
+            </div>
+
+            <p id="loader-message" style="display:none;">Initializing Simulation...</p>
+            <div class="progress-bar" id="progress-wrap" style="display:none;">
                 <div id="progress-bar-fill" class="progress-bar-fill"></div>
             </div>
         </div>
@@ -623,14 +653,12 @@
     </div>
 
     <script type="module">
-        import { oauthLoginUrl, oauthHandleRedirectIfPresent } from "@huggingface/hub";
         import { FilesetResolver, LlmInference } from '@mediapipe/tasks-genai';
 
         // --- Configuration & Constants ---
-        const MODEL_FILENAME = "gemma-3n-e2b-it-gpu-int4.bin"; // Local name
-        const use_e4b = false;
-        const modelSize = 0; // Disabled strict check due to model switch
-        const remoteFileUrl = 'https://huggingface.co/google/gemma-3n-E2B-it-litert-lm/resolve/main/gemma-3n-E2B-it-int4-Web.litertlm';
+        // Token-free community Gemma 4 LiteRT build (same as portfolio_2026).
+        const MODEL_URL = "https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/gemma-4-E2B-it-web.task";
+        const MODEL_FILENAME = "gemma-4-E2B-it-web.task";
 
         // --- Game State ---
         let gameState = {
@@ -665,14 +693,21 @@
 
         // --- Initialization ---
 
-        async function init() {
-            try {
-                await loadLlm();
-                startNewGame();
-            } catch (e) {
-                console.error("Init failed:", e);
-                loaderMessage.textContent = "Error initializing: " + e.message;
-            }
+        function init() {
+            // Nothing downloads until the user explicitly opts in.
+            const btn = document.getElementById('load-model-btn');
+            btn.addEventListener('click', async () => {
+                document.getElementById('model-gate').style.display = 'none';
+                loaderMessage.style.display = 'block';
+                document.getElementById('progress-wrap').style.display = 'block';
+                try {
+                    await loadLlm();
+                    startNewGame();
+                } catch (e) {
+                    console.error("Init failed:", e);
+                    loaderMessage.textContent = "Error initializing: " + e.message;
+                }
+            });
         }
 
         // --- Model Loading (Adapted from Example) ---
@@ -682,169 +717,115 @@
         }
 
         async function loadLlm() {
-            loaderMessage.textContent = "Checking model cache...";
-
-            // Check for file protocol which often causes SecurityError with OPFS/WebGPU
             if (window.location.protocol === 'file:') {
-                alert("Local Security Restriction:\n\nThis game uses advanced WebGPU/OPFS features that browsers block in 'file://' mode.\n\nPlease run via a local web server (localhost).\n\nQuick fix: open terminal -> python -m http.server -> goto localhost:8000");
-                // We don't throw immediately to let it try, but it will likely fail below.
+                alert("Local Security Restriction:\n\nThis game uses WebGPU/OPFS features that browsers block in 'file://' mode.\n\nPlease run via a local web server, e.g.:\n  python -m http.server\nthen open http://localhost:8000");
             }
-
-            const isChrome = navigator.userAgent.includes('Chrome');
-            if (!isChrome && !navigator.userAgent.includes('Edg')) {
+            const ua = navigator.userAgent;
+            if (!ua.includes('Chrome') && !ua.includes('Edg')) {
                 alert('Please use Chrome or Edge for WebGPU support.');
             }
 
-            let opfs;
-            try {
-                opfs = await navigator.storage.getDirectory();
-            } catch (e) {
-                if (e.name === 'SecurityError') {
-                    throw new Error("Security Block: Browser prevented file system access. You are likely running from a local file without a server. Please serve this folder via HTTP (localhost).");
-                }
-                throw e;
-            }
+            loaderMessage.textContent = "Fetching Gemma 4 weights (cached after first download)…";
+            const { stream: modelStream, size: totalBytes } = await loadModelWithOpfsCache(MODEL_URL, MODEL_FILENAME);
 
-            let fileHandle;
-            let file;
+            const tracked = streamWithProgress(modelStream, totalBytes, (prog, downloaded, total) => {
+                updateProgressBar(Math.round(prog * 0.9));
+                const mb = (b) => (b / (1024 * 1024)).toFixed(0);
+                loaderMessage.innerHTML = total
+                    ? `Downloading Gemma 4… ${prog}% (${mb(downloaded)} / ${mb(total)} MB)<br><span style="font-size:0.8em;opacity:0.6;">Cached for next time</span>`
+                    : `Downloading Gemma 4… ${mb(downloaded)} MB`;
+            });
 
-            try {
-                fileHandle = await opfs.getFileHandle("3n_e2b");
-                file = await fileHandle.getFile();
-
-                // Check if we previously finished downloading
-                const isComplete = localStorage.getItem("3n_e2b_complete") === "true";
-
-                if (!isComplete) {
-                    console.log("Found partial download. Resuming...");
-                    throw new Error("Partial download");
-                }
-
-                // Verify file integrity (basic size check)
-                if (file.size < 1024 * 1024) {
-                    console.warn("Cached model file is too small. Deleting.");
-                    await fileHandle.remove();
-                    throw new Error("Corrupted cache");
-                }
-
-                console.log("Model found in cache. Size: " + (file.size / 1024 / 1024).toFixed(2) + " MB");
-            } catch (e) {
-                console.log("Downloading model...", e);
-
-                // If we are here, we are downloading (or resuming)
-                // If fileHandle exists (from Partial error), use it. otherwise create/get it.
-                if (!fileHandle) {
-                    try { fileHandle = await opfs.getFileHandle("3n_e2b", { create: true }); }
-                    catch (err) { /* ignore */ }
-                }
-
-                // Manual Token Input
-                let token = localStorage.getItem("hf_token");
-                if (!token) {
-                    token = prompt("Gemma 3n requires a Hugging Face Access Token.\n\n1. Go to huggingface.co/settings/tokens\n2. Create a 'Read' token\n3. Paste it here:");
-                    if (!token) throw new Error("Token required to download model.");
-                    localStorage.setItem("hf_token", token.trim());
-                }
-
-                // Check for partial file to resume
-                let existingSize = 0;
-                try {
-                    const existingFile = await fileHandle.getFile();
-                    existingSize = existingFile.size;
-                    if (existingSize > 0) {
-                        console.log(`Found partial file: ${(existingSize / 1e6).toFixed(1)}MB. Attempting resume...`);
-                    }
-                } catch (e) { /* ignore if file doesn't exist */ }
-
-                // Download
-                const headers = { "Authorization": `Bearer ${token}` };
-                if (existingSize > 0) headers["Range"] = `bytes=${existingSize}-`;
-
-                const response = await fetch(remoteFileUrl, { headers });
-
-                if (response.status === 401 || response.status === 403) {
-                    localStorage.removeItem("hf_token");
-                    const modelPage = "https://huggingface.co/google/gemma-3n-E2B-it-litert-lm";
-                    alert(`Access Denied (401/403).\n\n1. Ensure your token is correct.\n2. You MUST accept the license agreement for this SPECIFIC model (E2B).\n\nOpening model page in new tab...`);
-                    window.open(modelPage, '_blank');
-                    throw new Error("License not accepted. Please accept license at " + modelPage);
-                }
-
-                if (!response.ok) throw new Error("Download failed: " + response.statusText);
-
-                // Content-Length is only the *remaining* part if 206, or full if 200
-                const contentLength = Number(response.headers.get('content-length'));
-                const isPartial = response.status === 206;
-                const totalBytes = isPartial ? existingSize + contentLength : contentLength;
-
-                // If server didn't accept range (sent 200), we must start over
-                if (existingSize > 0 && !isPartial) {
-                    console.warn("Server doesn't support resume or restart forced. Overwriting.");
-                    existingSize = 0;
-                }
-
-                fileHandle = await opfs.getFileHandle("3n_e2b", { create: true });
-                // keepExistingData: true is critical for appending
-                let writeStream = await fileHandle.createWritable({ useAtomicWrite: false, keepExistingData: true });
-
-                if (isPartial) {
-                    await writeStream.seek(existingSize);
-                } else {
-                    // If we are starting over (status 200), truncate to be safe
-                    await writeStream.truncate(0);
-                }
-
-                const reader = response.body.getReader(); // Use response.body.getReader()
-                let writer = writeStream.getWriter();
-                let bytesCount = existingSize;
-                let bytesSinceLastCheckpoint = 0;
-                const CHECKPOINT_INTERVAL = 5 * 1024 * 1024; // 5MB (More frequent saves)
-
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
-
-                    bytesCount += value.length;
-                    bytesSinceLastCheckpoint += value.length;
-
-                    if (totalBytes) updateProgressBar(Math.round(bytesCount / totalBytes * 90));
-                    loaderMessage.innerHTML = `Downloading... ${(bytesCount / 1e6).toFixed(1)}MB / ${(totalBytes / 1e6).toFixed(1)}MB<br><span style="font-size: 0.8em; color: #aaa;">(Auto-saving every 5MB)</span>`;
-                    await writer.write(value);
-
-                    // Periodically close and re-open to "checkpoint" the file to disk
-                    if (bytesSinceLastCheckpoint > CHECKPOINT_INTERVAL) {
-                        await writer.close();
-                        console.log(`Checkpointing at ${bytesCount} bytes...`);
-
-                        // Re-open
-                        writeStream = await fileHandle.createWritable({ useAtomicWrite: false, keepExistingData: true });
-                        await writeStream.seek(bytesCount);
-                        writer = writeStream.getWriter();
-
-                        bytesSinceLastCheckpoint = 0;
-                    }
-                }
-                await writer.close();
-                localStorage.setItem("3n_e2b_complete", "true");
-                file = await fileHandle.getFile();
-            }
-
-            loaderMessage.textContent = "Initializing WebGPU Inference...";
+            loaderMessage.textContent = "Initializing WebGPU & compiling model…";
+            updateProgressBar(95);
             const fileset = await FilesetResolver.forGenAiTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-genai/wasm');
 
-            // Use stream reader to save memory during init if possible, or ArrayBuffer if the API requires strictly one. 
-            // The example uses Reader for modelAssetBuffer, so we will follow that.
-            const assetReader = file.stream().getReader();
-
             llmInference = await LlmInference.createFromOptions(fileset, {
-                baseOptions: { modelAssetBuffer: assetReader },
+                baseOptions: { modelAssetBuffer: tracked.getReader() },
                 maxTokens: 1024,
-                topK: 1,
+                topK: 8,
                 temperature: 0.8
             });
 
+            updateProgressBar(100);
             loaderOverlay.style.display = 'none';
             mainContainer.style.display = 'flex';
+        }
+
+        // Stream a ReadableStream while emitting download progress (percent + bytes).
+        function streamWithProgress(inputStream, contentLength, onProgress) {
+            let downloaded = 0;
+            const transformer = new TransformStream({
+                transform: (chunk, controller) => {
+                    downloaded += chunk.byteLength;
+                    const prog = contentLength > 0 ? Math.min(100, Math.round((downloaded / contentLength) * 100)) : 0;
+                    try { onProgress && onProgress(prog, downloaded, contentLength); } catch (_) {}
+                    controller.enqueue(chunk);
+                }
+            });
+            return inputStream.pipeThrough(transformer);
+        }
+
+        // Cache the large .task file in OPFS so the model is only downloaded once.
+        async function loadModelWithOpfsCache(modelUrl, fileName) {
+            try {
+                const opfsRoot = await navigator.storage.getDirectory();
+                try {
+                    const fileHandle = await opfsRoot.getFileHandle(fileName);
+                    const file = await fileHandle.getFile();
+                    const sizeHandle = await opfsRoot.getFileHandle(fileName + "_size");
+                    const expectedSize = parseInt(await (await sizeHandle.getFile()).text(), 10);
+                    if (Number.isFinite(expectedSize) && file.size === expectedSize) {
+                        console.log("[Gemma] Found valid model in OPFS cache.");
+                        return { stream: file.stream(), size: file.size };
+                    }
+                    await opfsRoot.removeEntry(fileName).catch(() => {});
+                    await opfsRoot.removeEntry(fileName + "_size").catch(() => {});
+                } catch (e) {
+                    if (e && e.name !== "NotFoundError") console.warn("[Gemma] OPFS read error:", e);
+                }
+
+                let expectedSize = 0;
+                try {
+                    const head = await fetch(modelUrl, { method: "HEAD" });
+                    if (head.ok) expectedSize = Number(head.headers.get("Content-Length") || 0);
+                } catch (_) {}
+
+                const response = await fetch(modelUrl);
+                if (!response.ok || !response.body) {
+                    throw new Error(`Failed to fetch Gemma 4 weights: ${response.status} ${response.statusText}. ` +
+                        `Make sure you've accepted the model license at huggingface.co/litert-community/gemma-4-E2B-it-litert-lm.`);
+                }
+
+                // Tee: one branch feeds the LLM, the other writes to OPFS in the background.
+                const [consumerStream, cacheStream] = response.body.tee();
+                (async () => {
+                    try {
+                        const fileHandle = await opfsRoot.getFileHandle(fileName, { create: true });
+                        const writable = await fileHandle.createWritable();
+                        const sizeHandle = await opfsRoot.getFileHandle(fileName + "_size", { create: true });
+                        const sizeWritable = await sizeHandle.createWritable();
+                        await sizeWritable.write(new TextEncoder().encode(String(expectedSize)));
+                        await sizeWritable.close();
+                        await cacheStream.pipeTo(writable);
+                        console.log(`[Gemma] Cached ${fileName} to OPFS.`);
+                    } catch (cacheErr) {
+                        console.error("[Gemma] Failed to cache model to OPFS:", cacheErr);
+                        await opfsRoot.removeEntry(fileName).catch(() => {});
+                        await opfsRoot.removeEntry(fileName + "_size").catch(() => {});
+                    }
+                })();
+
+                return { stream: consumerStream, size: expectedSize };
+            } catch (err) {
+                console.warn("[Gemma] OPFS unavailable, falling back to direct fetch:", err);
+                const response = await fetch(modelUrl);
+                if (!response.ok || !response.body) {
+                    throw new Error(`Failed to fetch Gemma 4 weights: ${response.status} ${response.statusText}`);
+                }
+                const expectedSize = Number(response.headers.get("Content-Length") || 0);
+                return { stream: response.body, size: expectedSize };
+            }
         }
 
         // --- Game Logic ---

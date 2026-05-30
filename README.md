@@ -1,6 +1,6 @@
 # The Match Maker — On-Device LLM Matchmaking Game
 
-A browser-based **AI matchmaking game** where **Gemma 3n runs entirely on your device** via MediaPipe Tasks GenAI. The large language model evaluates personality compatibility and generates match reasoning locally in WebAssembly — no API key, no cloud inference, full privacy.
+A browser-based **AI matchmaking game** where **Gemma 4 runs entirely on your device** via MediaPipe Tasks GenAI (WebGPU). The large language model evaluates personality compatibility and generates match reasoning locally — no API key, no cloud inference, full privacy. The model is an **opt-in download**: nothing is fetched until you click **Download & Play**, and it's cached in your browser (OPFS) so later visits skip the download.
 
 **[▶ Live Demo](https://woodyhoko.github.io/match-maker-game)**
 
@@ -12,21 +12,21 @@ Running a multi-billion-parameter LLM in a browser tab is a relatively recent ca
 
 1. **WebAssembly (WASM)** — near-native execution of compiled C++ inference kernels in the browser sandbox
 2. **MediaPipe Tasks GenAI** — Google's inference runtime compiled to WASM, with support for LiteRT (TFLite) and gguf-format models
-3. **Gemma 3n** — a compact architecture (1B–4B parameters) specifically designed for on-device inference efficiency via the **MobileNet Embedding (MNE)** approach, which uses per-layer weight matrices shared across a multi-scale feature hierarchy
+3. **Gemma 4 E2B** — a compact instruction-tuned model, distributed here as the token-free [`litert-community/gemma-4-E2B-it-litert-lm`](https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm) LiteRT build (the same model used by [portfolio_2026](https://github.com/woodyhoko/portfolio_2026))
 
-The result: a ~1.5 GB model download, then full LLM inference at 5–15 tokens/sec in the browser with no server round-trips.
+The result: a one-time model download (≈ 2 GB), then full LLM inference in the browser with no server round-trips.
 
 ---
 
-## 2. Gemma 3n and on-device LLMs
+## 2. On-device LLMs in the browser
 
-**Gemma 3n** (released May 2025) is designed for on-device use, introducing:
+The Gemma family is built for on-device use, and the general techniques that make a multi-billion-parameter model fit in a browser tab are:
 
-- **MatMul-free attention** — reduces memory bandwidth for KV-cache by compressing key/value projections
-- **Selective layer activation** — not all layers are evaluated for every token, reducing FLOP count
-- **INT4/INT8 quantization** — model weights stored in 4-bit integers; activations computed in float16/bfloat16
+- **Low-bit quantization** — weights are stored in 4-bit integers (INT4) while activations are computed at higher precision, cutting the memory footprint several-fold
+- **WebGPU acceleration** — inference kernels run on the GPU through the browser's WebGPU backend rather than the CPU
+- **Streaming + OPFS caching** — the weights are streamed once and persisted in the Origin Private File System, so they don't have to be re-downloaded on the next visit
 
-These techniques allow a model with the capability of a larger LLM to run with the memory footprint of a smaller one — critical for the ~6–8 GB VRAM limit of typical consumer GPUs, and for browser WASM which shares system RAM.
+These let a model run within the ~6–8 GB VRAM budget of typical consumer GPUs. This project uses the **Gemma 4 E2B** LiteRT build; for exact, verified architecture details refer to Google's official Gemma documentation rather than this README.
 
 ---
 
@@ -39,22 +39,22 @@ const fileset = await FilesetResolver.forGenAiTasks(
   'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-genai/wasm'
 );
 
-// Model binary streamed from OPFS cache (downloaded from HuggingFace on first run)
-const assetReader = modelFile.stream().getReader();
+// Weights are streamed from the HF mirror and tee'd into the OPFS cache on first run.
+const tracked = streamWithProgress(modelStream, totalBytes, onProgress);
 
 llmInference = await LlmInference.createFromOptions(fileset, {
-  baseOptions: { modelAssetBuffer: assetReader },
+  baseOptions: { modelAssetBuffer: tracked.getReader() },
   maxTokens: 1024,
-  topK: 1,           // source default — see note below
+  topK: 8,           // sample from the 8 most likely tokens
   temperature: 0.8
 });
 
 const result = await llmInference.generateResponse(prompt);
 ```
 
-> **Note on `topK`:** The source code uses `topK: 1`, which is greedy decoding — always picking the single most likely next token. This makes match scores deterministic (same profile pair → same score every time), but it limits response variety in the conversational phase. `temperature: 0.8` has no effect when `topK=1`. For more natural, varied AI client dialogue, change `topK` to `40`; for purely deterministic scoring, keep `topK: 1`.
+> **Note on `topK`:** This game uses `topK: 8` — at each step the model samples from the 8 most likely next tokens (combined with `temperature: 0.8`). That keeps the AI clients' dialogue varied and natural while staying coherent, instead of the rigid, repetitive output you get from greedy `topK: 1` decoding. Lower it toward `1` for more deterministic scoring, or raise it (e.g. `40`) for more variety.
 
-The model binary is downloaded once from HuggingFace Hub (ESM CDN) and cached by the browser's Cache Storage API — subsequent loads are instant.
+The model is fetched once from the token-free [`litert-community`](https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm) mirror and cached in the **Origin Private File System (OPFS)** — subsequent loads read straight from disk with no re-download.
 
 ---
 
@@ -108,9 +108,10 @@ WebGPU acceleration (when available) is automatically used by MediaPipe; the WAS
 
 | Layer | Technology |
 |---|---|
-| On-device LLM | [Gemma 3n](https://ai.google.dev/gemma) (INT4 quantized) |
-| Inference runtime | MediaPipe Tasks GenAI (WASM + optional WebGPU) |
-| Model hosting | HuggingFace Hub (ESM CDN) |
+| On-device LLM | [Gemma 4 E2B](https://ai.google.dev/gemma) (INT4 LiteRT build) |
+| Inference runtime | MediaPipe Tasks GenAI (WASM + WebGPU) |
+| Model hosting | [litert-community on HuggingFace](https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm) (token-free) |
+| Model cache | Origin Private File System (OPFS) |
 | Styling | Custom CSS — glassmorphism, Outfit + Playfair Display fonts |
 | Build | None — single HTML file, ES module imports |
 
@@ -122,7 +123,7 @@ WebGPU acceleration (when available) is automatically used by MediaPipe; the WAS
 # ES modules + SharedArrayBuffer require a server with COOP/COEP headers
 python -m http.server 8000
 # open http://localhost:8000
-# First load: ~1.5 GB model download (cached after)
+# First load: one-time ~2 GB model download (opt-in; cached in OPFS after)
 ```
 
 > `SharedArrayBuffer` requires `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp` headers. The live demo host configures these; a plain `python -m http.server` will not. Use a configured dev server (e.g. `vite` with `server.headers`) for local development.
